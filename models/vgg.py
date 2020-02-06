@@ -21,6 +21,7 @@ from keras.utils import get_file
 from . import retinanet
 from . import Backbone
 from utils.image import preprocess_image
+import configure
 
 
 class VGGBackbone(Backbone):
@@ -97,3 +98,40 @@ def vgg_retinanet(num_classes, backbone='vgg16', inputs=None, modifier=None, **k
     layer_names = ["block3_pool", "block4_pool", "block5_pool"]
     layer_outputs = [vgg.get_layer(name).output for name in layer_names]
     return retinanet.retinanet(inputs=inputs, num_classes=num_classes, backbone_layers=layer_outputs, **kwargs)
+
+
+def vgg_fsaf(num_classes, backbone='vgg16', inputs=None, modifier=None, **kwargs):
+    """
+    Constructs a retinanet model using a resnet backbone.
+
+    Args
+        num_classes: Number of classes to predict.
+        backbone: Which backbone to use (one of ('vgg16', 'vgg19')).
+        inputs: The inputs to the network (defaults to a Tensor of shape (None, None, 3)).
+        modifier: A function handler which can modify the backbone before using it in retinanet (this can be used to freeze backbone layers for example).
+
+    Returns
+        FSAF model with a VGG backbone.
+    """
+    image_input = keras.layers.Input(shape=(None, None, 3))
+    gt_boxes_input = keras.layers.Input(shape=(configure.MAX_NUM_GT_BOXES, 5))
+    feature_shapes_input = keras.layers.Input((5, 2), dtype='int32')
+
+    # create the resnet backbone
+    if backbone == 'vgg16':
+        vgg = keras.applications.VGG16(input_tensor=inputs, include_top=False, weights=None)
+    elif backbone == 'vgg19':
+        vgg = keras.applications.VGG19(input_tensor=inputs, include_top=False, weights=None)
+    else:
+        raise ValueError("Backbone '{}' not recognized.".format(backbone))
+
+    # invoke modifier if given
+    if modifier:
+        vgg = modifier(vgg)
+
+    layer_names = ["block3_pool", "block4_pool", "block5_pool"]
+    layer_outputs = [vgg.get_layer(name).output for name in layer_names]
+    # create the full model
+    return retinanet.fsaf(inputs=[image_input, gt_boxes_input, feature_shapes_input],
+                          num_classes=num_classes,
+                          backbone_layers=layer_outputs)
