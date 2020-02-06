@@ -53,6 +53,12 @@ class VGGBackbone(Backbone):
             file_hash=checksum
         )
 
+    def fsaf(self, num_classes, modifier):
+        """
+        Returns a retinanet model using the correct backbone.
+        """
+        return vgg_fsaf(num_classes=num_classes, backbone=self.backbone, modifier=modifier)
+
     def validate(self):
         """ Checks whether the backbone string is correct.
         """
